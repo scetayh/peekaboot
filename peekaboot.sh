@@ -32,10 +32,16 @@ readonly TIMEOUT=60
 # - 1920x1200 (16:10, default)
 # - 1920x1440 (4:3)
 # - 1920x1280 (3:2)
-readonly GFXMODE="1920x1200"
+GFXMODE="$1"
 readonly ARCH="$(arch)"
 
 # ===== main =====
+
+# check parameters
+if [[ -e "$GFXMODE" ]]; then
+    GFXMODE=1920x1200
+fi
+readonly GFXMODE
 
 # clean up
 rm -rf "${ISO_ROOT}" "${ISO}"
@@ -72,7 +78,7 @@ unset mod
 # part 3 start
 cat >> "${ISO_ROOT}/${GRUB_CFG}" << EOF
 
-set gfxmode=${GFXMODE},1920x1200,auto
+set gfxmode=${GFXMODE},auto
 set gfxpayload=keep
 
 terminal_output gfxterm
@@ -81,7 +87,7 @@ EOF
 # part 3 end
 
 # part 4 start
-for font in *.pf2; do
+for font in $(find -name "*.pf2" 2> /dev/null); do
     echo "loadfont /${GRUB_THIS_THEME_DIR}/${font}" >> "${ISO_ROOT}/${GRUB_CFG}"
 done
 unset font
