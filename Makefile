@@ -1,4 +1,4 @@
-.PHONY: install uninstall
+.PHONY: install uninstall clean
 
 peekaboot:
 	mkdir -p build
@@ -9,4 +9,7 @@ install:
 	cp build/peekaboot /usr/local/bin/
 
 uninstall:
-	rm /usr/locak/bin/peekaboot
+	rm /usr/local/bin/peekaboot
+
+clean:
+	rm build/*
