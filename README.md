@@ -1,17 +1,36 @@
-# PeekABoot v0.1.0
+# PeekABoot v0.1.1
+
+A lightweight GRUB theme previewer via QEMU.
+
+## Installation
+
+Clone this repository, then just `make` this project:
+
+``` bash
+make
+sudo make install
+```
+
+This will copy the `peekaboot.sh` script to an executive `peekaboot` file, and install the latter to `/usr/local/bin`.
+
+## Usage
 
 ```
-Usage: peekaboot [ options ] [ argument ]
-A lightweight GRUB theme previewer via QEMU.
-<argument> will be the current directory if not assigned.
+Usage: /usr/local/bin/peekaboot [ options ] [ <theme directory> ]
+A lightweight GRUB theme previewer via QEMU
+If not specified, <theme directory> will be the current directory.
 
 Options:
-  -r, --resolution <integer>x<integer>      Set resolution of QEMU VM under GFX
-                                            mode (default: 1920x1080).
-  -h, --help                                Display usage.
-  -V, --version                             Display version.
+  -h, --help
+         Display this help and exit.
+  -V, --version
+         Output version information and exit.
+  -r, --resolution <integer>x<integer>
+         Specify the resolution of QEMU VM in GFX mode (default: 1920x1080).
+  -t, --timeout <seconds>
+         Specify the GRUB period seconds (default: 60).
 
 Examples:
-  $0 -r 1920x1080 ~/hello/Projects/my-grub-theme
-  $0 ~/hello/Projects/my-grub-theme
+  /usr/local/bin/peekaboot -r 1920x1080 ~/hello/Projects/my-grub-theme
+  /usr/local/bin/peekaboot ~/hello/Projects/my-grub-theme
 ```
