@@ -1,40 +1,31 @@
 #!/usr/bin/env bash
+set -Eeo pipefail
+shopt -s inherit_errexit
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+IFS=$'\n\t'
 
-# ===== version =====
+readonly VERSION=0.1.1
 
-readonly VERSION=0.1.0
-
-# ===== utility functions =====
-
-if [[ -t 1 ]] && [[ -t 2 ]] && [[ "$(tput colors)" -ge 8 ]]; then
-    readonly COLOR_RESET='\033[0m'
-    readonly COLOR_WARN='\033[1;33m'
-    readonly COLOR_ERROR='\033[1;31m'
-fi
-
-log_warn() {
-    echo -e "${COLOR_WARN}warning:${COLOR_RESET} $*" >&2
+echo_err() {
+    echo "Error: $*" >&2
 }
 
-log_error() {
-    echo -e "${COLOR_ERROR}error:${COLOR_RESET} $*" >&2
-}
-
-log_error_parse_argument() {
-    log_error "failed to parse argument"
-}
-
-print_usage() {
-    cat << EOF
-Usage: $0 [ options ] [ argument ]
-A lightweight GRUB theme previewer via QEMU.
-<argument> will be the current directory if not assigned.
+usage() {
+    cat >&2 << EOF
+Usage: $0 [ options ] [ <theme directory> ]
+A lightweight GRUB theme previewer via QEMU
+If not specified, <theme directory> will be the current directory.
 
 Options:
-  -r, --resolution <integer>x<integer>      Set resolution of QEMU VM under GFX
-                                            mode (default: 1920x1080).
-  -h, --help                                Display usage.
-  -V, --version                             Display version.
+  -h, --help
+         Display this help and exit.
+  -V, --version
+         Output version information and exit.
+  -r, --resolution <integer>x<integer>
+         Specify the resolution of QEMU VM in GFX mode (default: 1920x1080).
+  -t, --timeout <seconds>
+         Specify the GRUB period seconds (default: 60).
 
 Examples:
   $0 -r 1920x1080 ~/hello/Projects/my-grub-theme
@@ -42,261 +33,214 @@ Examples:
 EOF
 }
 
-# ===== check commands =====
+main() {
+    opt_short=hVr:t:
+    opt_long=help,version,resolution:,timeout:
 
-for command in \
-    cat getopt basename arch find grub-mkrescue;
-do
-    command -v -- "$command" &> /dev/null|| {
-        log_error "command '$command' not found";
-        exit 127;
+    opt="$(getopt -o "$opt_short" -l "$opt_long" -n "$0" -- "$@")"
+    eval set -- "$opt"
+
+    has_flag_h=0
+    has_flag_V=0
+    has_option_r=0
+    option_r_value=""
+    has_option_t=0
+    option_t_value=""
+
+    while true; do
+        case "$1" in
+            -h|--help)
+                has_flag_h=1
+                shift 1
+                ;;
+            -V|--version)
+                has_flag_V=1
+                shift 1
+                ;;
+            -r|--resolution)
+                has_option_r=1
+                option_r_value="$2"
+                shift 2
+                ;;
+            -t|--timeout)
+                has_option_t=1
+                option_t_value="$2"
+                shift 2
+                ;;
+            --)
+                shift 1
+                break
+                ;;
+            *)
+                echo_err "unparsed option '$1'"
+                return 1
+                ;;
+        esac
+    done
+
+    (( has_flag_V )) && {
+        echo $VERSION
+        return 0
     }
-done
-
-# ===== parse parameters =====
-
-opt="$(getopt -o "r:hV" -l "resolution:,help,version" -n "$0" -- "$@")" || {
-    log_error_parse_argument
-    exit 127
-}
-
-eval set -- "$opt" || {
-    log_error_parse_argument
-    exit 127
-}
-
-while true; do
-    case "$1" in
-        -r|--resolution)
-            RESOLUTION="$2"
-            shift 2
-            ;;
-        -h|--help)
-            shift
-            print_usage
-            exit 0
-            ;;
-        -V|--version)
-            echo "$VERSION"
-            exit 0
-            ;;
-        --)
-            shift
-            if [ $# -gt 1 ]; then
-                log_error "too many arguments"
-                exit 127
-            elif [ $# -eq 1 ]; then
-                SRC="$1"
-                shift
-            fi
-            break
-            ;;
-        *)
-            echo "unparsed option '$1'" >&2
-            exit 1
-            ;;
-    esac
-done
-
-# ===== check variables =====
-
-# RESOLUTION
-
-if ! [[ "$RESOLUTION" =~ ^[0-9]+x[0-9]+$ ]]; then
-    log_error "invalid resolution, '<integer>x<integer>' (e.g. 1920x1080) expected"
-    exit 127
-fi
-
-[[ -z "$RESOLUTION" ]] && \
-    RESOLUTION=1920x1080
-
-# SRC
-
-[[ ! -d "$SRC" ]] && {
-    log_error "directory '$SRC' do not exist"
-    exit 2
-}
-
-[[ -z "$SRC" ]] && \
-    SRC=.
-
-# THEME
-
-THEME="$(basename "$SRC")" || {
-    log_error "failed to parse directory name as theme name"
-    exit 127
-}
-
-# TMP
-
-TMP=$(mktemp -d "/tmp/peekaboot.XXXXXXXXXX") || {
-    log_error "failed to create temporary directory"
-    exit 127
-}
-
-# UNIFONT
-
-UNIFONT=/usr/share/grub/unicode.pf2
-[[ ! -f $UNIFONT ]] && \
-    UNIFONT=""
-
-# ARCH
-
-ARCH=$(arch) || {
-    log_error "failed to get architechture"
-    exit 127
-}
-
-# ===== set constants =====
-
-readonly RESOLUTION
-readonly SRC
-readonly THEME
-readonly TMP
-readonly ISO_ROOT="${TMP}/iso_root"
-readonly ISO="${TMP}/${THEME}.iso"
-readonly GRUB_DIR="boot/grub"
-readonly GRUB_FONTS_DIR="${GRUB_DIR}/fonts"
-readonly GRUB_THEME_DIR="${GRUB_DIR}/themes"
-readonly GRUB_THIS_THEME_DIR="${GRUB_THEME_DIR}/${THEME}"
-readonly GRUB_CFG="${GRUB_DIR}/grub.cfg"
-readonly UNIFONT
-readonly TIMEOUT=60
-readonly ARCH
-
-# ===== main =====
-
-# create directories
-mkdir -p "$ISO_ROOT/$GRUB_FONTS_DIR" "$ISO_ROOT/$GRUB_THEME_DIR" || {
-    log_error "failed to create necessary directories"
-    exit 127
-}
-
-# copy theme
-cp -r "$SRC" "${ISO_ROOT}/${GRUB_THEME_DIR}" || {
-    log_error "failed to copy theme"
-    exit 127
-}
-
-# copy Unicode font
-[[ -n "${UNIFONT}" ]] && {
-    cp "${UNIFONT}" "${ISO_ROOT}/${GRUB_FONTS_DIR}/" || {
-        log_warn "failed to copy Unicode font; skipping"
+    (( has_flag_h )) && {
+        usage
+        return 0
     }
-}
 
+    [[ $# -eq 0 ]] || [[ $# -eq 1 ]] || {
+        echo_err "too many arguments"
+        return 1
+    }
 
-# generate 'grub.cfg'
+    [[ $# -eq 1 ]] && {
+        [[ ! -f "$1" ]] || {
+            echo_err "'$1' is a file"
+        }
 
-{
+        [[ -d "$1" ]] || {
+            echo_err "'$1' do not exist"
+        }
+    }
 
-# part 1 start
-cat << EOF
+    (( has_option_r )) && {
+        [[ "$option_r_value" =~ ^[0-9]+x[0-9]+$ ]] || {
+            echo_err "invalid resolution '$option_r_value'"
+            return 1
+        }
+    }
+    
+    (( has_option_t )) && {
+        [[ "$option_t_value" -gt 0 ]] &> /dev/null || {
+            echo_err "invalid timeout seconds '$option_t_value'"
+            return 1
+        }
+    }
+    
+    src_dir=
+    theme=
+    resolution=
+    tmp=
+    iso_root=
+    grub_dir=
+    grub_theme_dir=
+    grub_this_theme_dir=
+    timeout=
+    iso=
+    arch=
+
+    [[ $# -eq 0 ]] && \
+        src_dir=.
+    [[ $# -eq 1 ]] && \
+        src_dir="$1"
+    
+    theme="$(basename "$src_dir")"
+
+    if (( has_option_r )); then
+        resolution=$option_r_value
+    else
+        resolution=1920x1080
+    fi
+
+    tmp=$(mktemp -d "/tmp/peekaboot.XXXXXXXXXX")
+    iso_root=$tmp/iso_root
+    grub_dir=boot/grub
+    grub_theme_dir=$grub_dir/themes
+    grub_this_theme_dir=$grub_theme_dir/$theme
+
+    if (( has_option_t )); then
+        timeout=$option_t_value
+    else
+        timeout=60
+    fi
+
+    iso=$tmp/grub.iso
+    arch=$(arch)
+
+    mkdir -p "$iso_root/$grub_theme_dir"
+
+    cp -r "$src_dir" "$iso_root/$grub_theme_dir"
+
+    {
+        cat << EOF
 set default=0
-set timeout=${TIMEOUT}
+set_timeout=$timeout
 
-EOF
-# part 1 end
+insmod all_video
+insmod gfxterm
+insmod gfxmenu
+insmod png
+insmod font
 
-# part 2 start
-for mod in all_video gfxterm gfxmenu png font; do
-    echo "insmod ${mod}"
-done
-# part 2 end
-
-# part 3 start
-cat << EOF
-
-set gfxmode=${RESOLUTION},auto
-set gfxpayload=keep
-
+set gfxmode=$resolution,auto
+set gfxplayload=keep
 terminal_output gfxterm
 
 EOF
-# part 3 end
 
-# part 4 start
-find . -type f -name "*.pf2" -print0 2> /dev/null | \
-while IFS= read -r -d '' font; do
-    # strip leading './' if present to match previous behavior
-    fpath="${font#./}"
-    echo "loadfont /${GRUB_THIS_THEME_DIR}/${fpath}"
-done
-# part 4 end
-
-# part 5 start
-cat << EOF
-loadfont /${GRUB_FONTS_DIR}/unicode.pf2
-
-set theme=/${GRUB_THIS_THEME_DIR}/theme.txt
-
-EOF
-# part 5 end
-
-# part 6 start
-i=0
-for distro in \
-    gentoo \
-    arch \
-    debian \
-    fedora \
-    ubuntu \
-    kali \
-    opensuse \
-    steamos \
-    zorin \
-    deepin \
-    lfs \
-    linuxmint \
-    iso \
-    restart \
-    shutdown;
-do
-    if (( (i & 1) == 0 )); then
-        parity="even"
-    else
-        parity="odd"
-    fi
-    
-    {
-        echo "menuentry '${distro}' --class ${distro} --class ${parity} {"
-        echo "    echo 'Entry ${i}'"
+        find . -type f -name "*.pf2" -print0 2> /dev/null | \
+            while IFS= read -r -d '' font; do
+                echo "loadfont /$grub_dir/${font#./}"
+            done
         
-        if [[ "${distro}" == "restart" ]]; then
-            echo "    reboot"
-        fi
-        if [[ "${distro}" == "shutdown" ]]; then
-            echo "    halt"
-        fi
+        cat << EOF
 
-        echo "}"
-    }
+set theme=/$grub_this_theme_dir/theme.txt
 
-    ((i++))
-done
-# part 6 end
+menuentry 'Gentoo GNU/Linux' --class gentoo --class gnu-linux --class gnu --class os {
+        echo    'Loading Linux 7.1.8 ...'
+        echo    'Loading initial ramdisk...'
+}
+submenu 'Advanced options for Gentoo GNU/Linux' {
+        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8' --class gentoo --class gnu-linux --class gnu --class os {
+                echo    'Loading Linux 7.1.8 ...'
+                echo    'Loading initial ramdisk...'
+        }
+        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8 (recovery mode)' --class gentoo --class gnu-linux --class gnu --class os {
+                echo    'Loading Linux 7.1.8 ...'
+                echo    'Loading initial ramdisk...'
+        }
+}
+menuentry 'Gentoo GNU/Linux' --class gentoo --class gnu-linux --class gnu --class os {
+        echo    'Loading Linux 7.1.8 ...'
+        echo    'Loading initial ramdisk...'
+}
+submenu 'Advanced options for Gentoo GNU/Linux' {
+        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8' --class gentoo --class gnu-linux --class gnu --class os {
+                echo    'Loading Linux 7.1.8 ...'
+                echo    'Loading initial ramdisk...'
+        }
+        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8 (recovery mode)' --class gentoo --class gnu-linux --class gnu --class os {
+                echo    'Loading Linux 7.1.8 ...'
+                echo    'Loading initial ramdisk...'
+        }
+}
+menuentry "Restart" --class reboot --class restart {
+    reboot
+}
+menuentry "Power off" --class shutdown --class poweroff --class halt {
+    halt
+}
+EOF
+    } > "$iso_root/$grub_dir/grub.cfg"
+    
+    grub-mkrescue -o "$iso" "$iso_root"
 
-} >> "${ISO_ROOT}/${GRUB_CFG}" || {
-    log_error "failed to generate 'grub.cfg'"
-    exit 127
+    "qemu-system-$arch" \
+        -M virt -cpu cortex-a57 \
+        -bios "/usr/share/qemu/edk2-$arch-code.fd" \
+        -cdrom "$iso" \
+        -device virtio-gpu-pci \
+        -m 256M \
+        -serial stdio \
+        -display gtk
 }
 
-# create GRUB ISO
-grub-mkrescue -o "${ISO}" "${ISO_ROOT}" || {
-    log_error "failed to create GRUB rescue ISO"
-    exit 127
-}
-
-# launch QEMU virtual machine
-qemu-system-${ARCH} \
-    -M virt -cpu cortex-a57 \
-    -bios /usr/share/qemu/edk2-$ARCH-code.fd \
-    -cdrom "$ISO" \
-    -device virtio-gpu-pci \
-    -m 256M \
-    -serial stdio \
-    -display gtk \
-|| {
-    log_error "failed to launch QEMU VM"
-    exit 127
-}
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo_err "Do not 'source' this script. You should run it directly."
+    exit 1
+else
+    [[ "$DEBUG" -eq 1 ]] && \
+        set -x
+    main "$@"
+    exit $?
+fi
