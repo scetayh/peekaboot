@@ -1,1 +1,3 @@
 build/
+.gitignore
+update.sh
