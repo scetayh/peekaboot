@@ -5,7 +5,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 IFS=$'\n\t'
 
-readonly VERSION=0.1.1
+readonly VERSION=0.1.2
 
 echo_err() {
     echo "Error: $*" >&2
@@ -186,20 +186,6 @@ EOF
 
 set theme=/$grub_this_theme_dir/theme.txt
 
-menuentry 'Gentoo GNU/Linux' --class gentoo --class gnu-linux --class gnu --class os {
-        echo    'Loading Linux 7.1.8 ...'
-        echo    'Loading initial ramdisk...'
-}
-submenu 'Advanced options for Gentoo GNU/Linux' {
-        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8' --class gentoo --class gnu-linux --class gnu --class os {
-                echo    'Loading Linux 7.1.8 ...'
-                echo    'Loading initial ramdisk...'
-        }
-        menuentry 'Gentoo GNU/Linux, with Linux 7.1.8 (recovery mode)' --class gentoo --class gnu-linux --class gnu --class os {
-                echo    'Loading Linux 7.1.8 ...'
-                echo    'Loading initial ramdisk...'
-        }
-}
 menuentry 'Gentoo GNU/Linux' --class gentoo --class gnu-linux --class gnu --class os {
         echo    'Loading Linux 7.1.8 ...'
         echo    'Loading initial ramdisk...'
