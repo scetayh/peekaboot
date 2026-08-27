@@ -22,20 +22,21 @@ Options:
          Display this help and exit.
   -V, --version
          Output version information and exit.
-  -r, --resolution <integer>x<integer>
+  -r, --resolution=<integer>x<integer>
          Specify the resolution of QEMU VM in GFX mode (default: 1920x1080).
-  -t, --timeout <seconds>
+  -c, --background-color=<color>
+  -t, --timeout=<seconds>
          Specify the GRUB period seconds (default: 60).
 
 Examples:
   $0 -r 1920x1080 ~/hello/Projects/my-grub-theme
-  $0 ~/hello/Projects/my-grub-theme
+  $0 -c "#233333" ~/hello/Projects/my-grub-theme
 EOF
 }
 
 main() {
-    opt_short=hVr:t:
-    opt_long=help,version,resolution:,timeout:
+    opt_short=hVr:c:t:
+    opt_long=help,version,resolution:,background-color:,timeout:
 
     opt="$(getopt -o "$opt_short" -l "$opt_long" -n "$0" -- "$@")"
     eval set -- "$opt"
@@ -44,6 +45,8 @@ main() {
     has_flag_V=0
     has_option_r=0
     option_r_value=""
+    has_option_c=0
+    option_c_value=""
     has_option_t=0
     option_t_value=""
 
@@ -62,6 +65,12 @@ main() {
                 option_r_value="$2"
                 shift 2
                 ;;
+            -c|--background-color)
+                has_option_c=1
+                option_c_value="$2"
+                shift 2
+                ;;
+            
             -t|--timeout)
                 has_option_t=1
                 option_t_value="$2"
@@ -176,6 +185,9 @@ set gfxplayload=keep
 terminal_output gfxterm
 
 EOF
+
+        (( has_option_c )) && \
+            echo "background_color \"$option_c_value\""
 
         find . -type f -name "*.pf2" -print0 2> /dev/null | \
             while IFS= read -r -d '' font; do
