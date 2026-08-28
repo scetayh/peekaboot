@@ -5,7 +5,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 IFS=$'\n\t'
 
-readonly VERSION=0.1.2
+readonly VERSION=0.1.3
 
 echo_err() {
     echo "Error: $*" >&2
@@ -189,9 +189,9 @@ EOF
         (( has_option_c )) && \
             echo "background_color \"$option_c_value\""
 
-        find . -type f -name "*.pf2" -print0 2> /dev/null | \
+        find "$iso_root/$grub_this_theme_dir" -maxdepth 1 -type f -name "*.pf2" -print0 2> /dev/null | \
             while IFS= read -r -d '' font; do
-                echo "loadfont /$grub_dir/${font#./}"
+                echo "loadfont /$grub_this_theme_dir/$(basename "$font")"
             done
         
         cat << EOF
