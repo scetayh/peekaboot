@@ -5,7 +5,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 IFS=$'\n\t'
 
-readonly VERSION=0.1.3
+readonly VERSION=0.2.0
 
 echo_err() {
     echo "Error: $*" >&2
@@ -25,18 +25,22 @@ Options:
   -r, --resolution=<integer>x<integer>
          Specify the resolution of QEMU VM in GFX mode (default: 1920x1080).
   -c, --background-color=<color>
+         Specify the background color of GRUB command line area.
+  -C, --color-normal=<color>/<color>
+         Specify the chatacter foreground/background color.
   -t, --timeout=<seconds>
          Specify the GRUB period seconds (default: 60).
 
 Examples:
   $0 -r 1920x1080 ~/hello/Projects/my-grub-theme
   $0 -c "#233333" ~/hello/Projects/my-grub-theme
+  $0 -c "#ffaf5f" -C "light-magenta/black" ~/hello/Projects/my-grub-theme
 EOF
 }
 
 main() {
-    opt_short=hVr:c:t:
-    opt_long=help,version,resolution:,background-color:,timeout:
+    opt_short=hVr:c:C:t:
+    opt_long=help,version,resolution:,background-color:,color-normal:,timeout:
 
     opt="$(getopt -o "$opt_short" -l "$opt_long" -n "$0" -- "$@")"
     eval set -- "$opt"
@@ -70,7 +74,11 @@ main() {
                 option_c_value="$2"
                 shift 2
                 ;;
-            
+            -C|--color-normal)
+                has_option_C=1
+                option_C_value="$2"
+                shift 2
+                ;;
             -t|--timeout)
                 has_option_t=1
                 option_t_value="$2"
@@ -188,6 +196,8 @@ EOF
 
         (( has_option_c )) && \
             echo "background_color \"$option_c_value\""
+        (( has_option_C )) && \
+            echo "set color_normal=\"$option_C_value\""
 
         find "$iso_root/$grub_this_theme_dir" -maxdepth 1 -type f -name "*.pf2" -print0 2> /dev/null | \
             while IFS= read -r -d '' font; do
