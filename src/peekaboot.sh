@@ -5,7 +5,7 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 IFS=$'\n\t'
 
-readonly VERSION=0.2.0
+readonly VERSION=0.2.1
 
 echo_err() {
     echo "Error: $*" >&2
