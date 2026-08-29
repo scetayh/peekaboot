@@ -23,7 +23,7 @@ Options:
   -V, --version
          Output version information and exit.
   -r, --resolution=<integer>x<integer>
-         Specify the resolution of QEMU VM in GFX mode (default: 1920x1080).
+         Specify the resolution of QEMU VM in GFX mode (default: 1920x1200).
   -c, --background-color=<color>
          Specify the background color of GRUB command line area.
   -C, --color-normal=<color>/<color>
@@ -155,7 +155,7 @@ main() {
     if (( has_option_r )); then
         resolution=$option_r_value
     else
-        resolution=1920x1080
+        resolution=1920x1200
     fi
 
     tmp=$(mktemp -d "/tmp/peekaboot.XXXXXXXXXX")
@@ -194,10 +194,10 @@ terminal_output gfxterm
 
 EOF
 
-        (( has_option_c )) && \
+        (( has_option_c )) && {
             echo "background_color \"$option_c_value\""
-        (( has_option_C )) && \
-            echo "set color_normal=\"$option_C_value\""
+            echo
+        }
 
         find "$iso_root/$grub_this_theme_dir" -maxdepth 1 -type f -name "*.pf2" -print0 2> /dev/null | \
             while IFS= read -r -d '' font; do
@@ -228,7 +228,10 @@ menuentry "Restart" --class reboot --class restart {
 menuentry "Power off" --class shutdown --class poweroff --class halt {
     halt
 }
+
 EOF
+        (( has_option_C )) && \
+            echo "set color_normal=\"$option_C_value\""
     } > "$iso_root/$grub_dir/grub.cfg"
     
     grub-mkrescue -o "$iso" "$iso_root"
